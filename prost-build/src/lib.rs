@@ -947,11 +947,10 @@ impl Config {
     fn generate(&mut self, files: Vec<FileDescriptorProto>) -> Result<HashMap<Module, String>> {
         let mut modules = HashMap::new();
         let mut packages = HashMap::new();
-        let deps = self
-            .manifest_tpl
-            .is_some()
-            .then(|| self.build_deps(&files))
-            .unwrap_or_default();
+        let deps = match self.manifest_tpl {
+            Some(_) => self.build_deps(&files),
+            None => Default::default(),
+        };
 
         let message_graph = MessageGraph::new(&files)
             .map_err(|error| Error::new(ErrorKind::InvalidInput, error))?;
@@ -982,7 +981,7 @@ impl Config {
             for (module, _) in &modules {
                 mods.push(module);
             }
-            let name = self.manifest_tpl.is_some().then(|| "lib").unwrap_or("mod");
+            let name = self.manifest_tpl.as_ref().map(|_| "lib").unwrap_or("mod");
             let mut buf = modules.entry(vec![name.to_owned()]).or_default();
             LibGenerator::generate_librs(self, &mods, &mut buf);
         }
