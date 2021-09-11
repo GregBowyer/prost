@@ -1,7 +1,7 @@
 use prost_types::source_code_info::Location;
 
 /// Comments on a Protobuf item.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Comments {
     /// Leading detached blocks of comments.
     pub leading_detached: Vec<Vec<String>>,

@@ -7,7 +7,6 @@ use itertools::{Either, Itertools};
 use log::debug;
 use multimap::MultiMap;
 use prost_types::field_descriptor_proto::{Label, Type};
-use prost_types::source_code_info::Location;
 use prost_types::{
     DescriptorProto, EnumDescriptorProto, EnumValueDescriptorProto, FieldDescriptorProto,
     FieldOptions, FileDescriptorProto, OneofDescriptorProto, ServiceDescriptorProto,
@@ -48,7 +47,7 @@ impl<'a> CodeGenerator<'a> {
     ) {
         let mut source_info = file
             .source_code_info
-            .expect("no source code info in request");
+            .unwrap_or_default();
         source_info.location.retain(|location| {
             let len = location.path.len();
             len > 0 && len % 2 == 0
@@ -551,14 +550,15 @@ impl<'a> CodeGenerator<'a> {
         self.buf.push_str("}\n");
     }
 
-    fn location(&self) -> &Location {
-        let idx = self
+    fn location_comments(&self) -> Comments {
+        self
             .source_info
             .location
             .binary_search_by_key(&&self.path[..], |location| &location.path[..])
-            .unwrap();
-
-        &self.source_info.location[idx]
+            .ok()
+            .map(|x| &self.source_info.location[x])
+            .map(Comments::from_location)
+            .unwrap_or_default()
     }
 
     fn append_doc(&mut self, fq_name: &str, field_name: Option<&str>) {
@@ -570,8 +570,9 @@ impl<'a> CodeGenerator<'a> {
         } else {
             self.config.disable_comments.get(fq_name).is_none()
         };
+
         if append_doc {
-            Comments::from_location(self.location()).append_with_indent(self.depth, &mut self.buf)
+            self.location_comments().append_with_indent(self.depth, &mut self.buf);
         }
     }
 
@@ -650,7 +651,7 @@ impl<'a> CodeGenerator<'a> {
         let name = service.name().to_owned();
         debug!("  service: {:?}", name);
 
-        let comments = Comments::from_location(self.location());
+        let comments = self.location_comments();
 
         self.path.push(2);
         let methods = service
@@ -660,7 +661,7 @@ impl<'a> CodeGenerator<'a> {
             .map(|(idx, mut method)| {
                 debug!("  method: {:?}", method.name());
                 self.path.push(idx as i32);
-                let comments = Comments::from_location(self.location());
+                let comments = self.location_comments();
                 self.path.pop();
 
                 let name = method.name.take().unwrap();
